@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Crunchy — Smart Task Prioritization</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #0a0a0f 0%, #0d1117 30%, #0a0f1a 60%, #0a0a0f 100%);
+    color: #ffffff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #starfield {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+  }
+
+  /* Glassmorphism Card */
+  .glass-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .glass-card-glow {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 0 30px rgba(0,200,255,0.04), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  /* Step Badge */
+  .step-badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    color: #00d4ff;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  /* Accent button */
+  .btn-accent {
+    background: linear-gradient(135deg, #00d4ff, #0099ff);
+    color: #fff;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 36px;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 0 25px rgba(0,212,255,0.3), 0 0 60px rgba(0,212,255,0.1);
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+  }
+  .btn-accent:hover {
+    box-shadow: 0 0 35px rgba(0,212,255,0.5), 0 0 80px rgba(0,212,255,0.2);
+    transform: translateY(-2px);
+  }
+  .btn-accent:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .btn-secondary {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.7);
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 14px 36px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .btn-secondary:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+
+  /* Muted text */
+  .text-muted { color: rgba(255,255,255,0.4); }
+  .text-body { color: rgba(255,255,255,0.7); }
+
+  /* Slider styling */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    background: rgba(255,255,255,0.1);
+    transition: opacity 0.2s;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 10px rgba(0,212,255,0.5);
+    cursor: pointer;
+    transition: box-shadow 0.2s;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 10px rgba(0,212,255,0.5);
+    cursor: pointer;
+    border: none;
+  }
+  input[type="range"]:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 18px rgba(0,212,255,0.8);
+  }
+
+  .slider-urgency { background: linear-gradient(90deg, #ff006e, #ff4da6) !important; }
+  .slider-importance { background: linear-gradient(90deg, #00f5a0, #00d9ff) !important; }
+  .slider-impact { background: linear-gradient(90deg, #00d4ff, #0099ff) !important; }
+  .slider-effort { background: linear-gradient(90deg, #ffd700, #ff8c00) !important; }
+  .slider-enjoyment { background: linear-gradient(90deg, #a855f7, #7c3aed) !important; }
+
+  /* Category badges */
+  .cat-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  /* Step Nav */
+  .step-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.25);
+    transition: color 0.3s;
+    cursor: default;
+    white-space: nowrap;
+  }
+  .step-nav-item.active {
+    color: #00d4ff;
+  }
+  .step-nav-item.completed {
+    color: #00f5a0;
+    cursor: pointer;
+  }
+  .step-nav-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s;
+  }
+  .step-nav-item.active .step-nav-icon {
+    background: rgba(0,212,255,0.15);
+    border-color: rgba(0,212,255,0.4);
+    box-shadow: 0 0 15px rgba(0,212,255,0.2);
+  }
+  .step-nav-item.completed .step-nav-icon {
+    background: rgba(0,245,160,0.15);
+    border-color: rgba(0,245,160,0.4);
+  }
+
+  .step-connector {
+    width: 40px;
+    height: 2px;
+    background: rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .step-connector.active { background: rgba(0,212,255,0.3); }
+  .step-connector.completed { background: rgba(0,245,160,0.3); }
+
+  /* Context selector buttons */
+  .ctx-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.5);
+    transition: all 0.2s;
+  }
+  .ctx-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.7);
+  }
+  .ctx-btn.selected {
+    background: rgba(0,212,255,0.15);
+    border-color: rgba(0,212,255,0.4);
+    color: #00d4ff;
+  }
+
+  /* Task item */
+  .task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .task-item:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.1);
+  }
+  .task-accent-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #00d4ff, #0099ff);
+    border-radius: 3px 0 0 3px;
+  }
+
+  /* Input styling */
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .form-input:focus {
+    border-color: rgba(0,212,255,0.4);
+    box-shadow: 0 0 15px rgba(0,212,255,0.1);
+  }
+  .form-input::placeholder {
+    color: rgba(255,255,255,0.3);
+  }
+  select.form-input {
+    cursor: pointer;
+  }
+  select.form-input option {
+    background: #1a1a2e;
+    color: #fff;
+  }
+  textarea.form-input {
+    resize: vertical;
+    min-height: 60px;
+  }
+
+  /* Splash glow text */
+  .glow-text {
+    text-shadow: 0 0 40px rgba(0,212,255,0.3), 0 0 80px rgba(0,212,255,0.15);
+  }
+
+  /* Animations */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 30px rgba(0,212,255,0.2); }
+    50% { box-shadow: 0 0 60px rgba(0,212,255,0.4), 0 0 100px rgba(0,212,255,0.1); }
+  }
+  @keyframes orbPulse {
+    0%, 100% { transform: scale(1); filter: brightness(1); }
+    50% { transform: scale(1.15); filter: brightness(1.3); }
+  }
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-60px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(60px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-fade-in-up {
+    animation: fadeInUp 0.7s ease forwards;
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease forwards;
+  }
+
+  /* macOS window dots */
+  .macos-dots {
+    display: flex; gap: 7px; margin-bottom: 18px;
+  }
+  .macos-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+
+  /* Score bar */
+  .score-bar-track {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .glass-card, .glass-card-glow { padding: 16px; }
+    .btn-accent, .btn-secondary { padding: 12px 24px; font-size: 14px; }
+    .step-connector { width: 20px; }
+    .step-nav-item span.nav-label { display: none; }
+  }
+
+  /* Smooth scrolling */
+  html { scroll-behavior: smooth; }
+
+  /* Metric icon circle */
+  .metric-icon-circle {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Crunching animation elements */
+  .crunch-orb {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,212,255,0.4), rgba(0,153,255,0.1));
+    animation: orbPulse 1.5s ease-in-out infinite;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 50px rgba(0,212,255,0.3), 0 0 100px rgba(0,212,255,0.1);
+  }
+
+  .factor-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.6);
+    transition: all 0.4s;
+  }
+  .factor-badge.lit {
+    background: rgba(0,212,255,0.15);
+    border-color: rgba(0,212,255,0.4);
+    color: #00d4ff;
+    box-shadow: 0 0 15px rgba(0,212,255,0.15);
+  }
+
+  /* Delete button */
+  .delete-btn {
+    background: rgba(255,0,110,0.1);
+    border: 1px solid rgba(255,0,110,0.2);
+    color: #ff006e;
+    border-radius: 8px;
+    padding: 6px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .delete-btn:hover {
+    background: rgba(255,0,110,0.2);
+    border-color: rgba(255,0,110,0.4);
+  }
+
+  /* Add task form */
+  .add-task-form {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease, opacity 0.3s ease;
+    opacity: 0;
+  }
+  .add-task-form.open {
+    max-height: 800px;
+    opacity: 1;
+  }
+
+  /* Progress bar for crunching */
+  .crunch-progress {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+  .crunch-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #00d4ff, #0099ff);
+    width: 0%;
+    transition: width 0.3s linear;
+  }
+
+  /* Rank number */
+  .rank-number {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800;
+    font-size: 16px;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    color: #00d4ff;
+    flex-shrink: 0;
+  }
+
+  .explanation-card {
+    padding: 16px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 12px;
+    transition: all 0.2s;
+  }
+  .explanation-card:hover {
+    background: rgba(255,255,255,0.04);
+  }
+
+  /* Score breakdown hover */
+  .breakdown-row {
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 8px;
+  }
+  .breakdown-row:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+  }
+  .breakdown-details {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .breakdown-details.open {
+    max-height: 200px;
+  }
+
+  /* === V2 NEW STYLES === */
+
+  /* Toast notification */
+  .toast-notification {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 9999;
+    padding: 16px 24px;
+    border-radius: 12px;
+    background: rgba(0,245,160,0.15);
+    border: 1px solid rgba(0,245,160,0.4);
+    color: #00f5a0;
+    font-weight: 600;
+    font-size: 14px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 0 30px rgba(0,245,160,0.15);
+    animation: fadeInUp 0.4s ease forwards;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toast-notification.error {
+    background: rgba(255,0,110,0.15);
+    border: 1px solid rgba(255,0,110,0.4);
+    color: #ff006e;
+    box-shadow: 0 0 30px rgba(255,0,110,0.15);
+  }
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-20px); }
+  }
+  .toast-notification.dismissing {
+    animation: toastOut 0.3s ease forwards;
+  }
+
+  /* Upload drop zone */
+  .upload-zone {
+    border: 2px dashed rgba(0,212,255,0.25);
+    border-radius: 14px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(0,212,255,0.03);
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: rgba(0,212,255,0.5);
+    background: rgba(0,212,255,0.08);
+    box-shadow: 0 0 25px rgba(0,212,255,0.1);
+  }
+
+  /* Export button group */
+  .export-btn-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .export-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 22px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0,212,255,0.3);
+    background: rgba(0,212,255,0.08);
+    color: #00d4ff;
+    box-shadow: 0 0 15px rgba(0,212,255,0.1);
+  }
+  .export-btn:hover {
+    background: rgba(0,212,255,0.18);
+    border-color: rgba(0,212,255,0.5);
+    box-shadow: 0 0 25px rgba(0,212,255,0.25);
+    transform: translateY(-2px);
+  }
+  .export-btn.excel {
+    border-color: rgba(0,245,160,0.3);
+    background: rgba(0,245,160,0.08);
+    color: #00f5a0;
+    box-shadow: 0 0 15px rgba(0,245,160,0.1);
+  }
+  .export-btn.excel:hover {
+    background: rgba(0,245,160,0.18);
+    border-color: rgba(0,245,160,0.5);
+    box-shadow: 0 0 25px rgba(0,245,160,0.25);
+  }
+  .export-btn.doc {
+    border-color: rgba(168,85,247,0.3);
+    background: rgba(168,85,247,0.08);
+    color: #a855f7;
+    box-shadow: 0 0 15px rgba(168,85,247,0.1);
+  }
+  .export-btn.doc:hover {
+    background: rgba(168,85,247,0.18);
+    border-color: rgba(168,85,247,0.5);
+    box-shadow: 0 0 25px rgba(168,85,247,0.25);
+  }
+
+  /* Life story textarea */
+  .life-story-textarea {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 15px;
+    line-height: 1.6;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    resize: vertical;
+    min-height: 120px;
+    font-family: inherit;
+  }
+  .life-story-textarea:focus {
+    border-color: rgba(0,212,255,0.4);
+    box-shadow: 0 0 20px rgba(0,212,255,0.1);
+  }
+  .life-story-textarea::placeholder {
+    color: rgba(255,255,255,0.25);
+    font-style: italic;
+  }
+  .char-counter {
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+    text-align: right;
+    margin-top: 6px;
+    transition: color 0.2s;
+  }
+  .char-counter.warn {
+    color: rgba(255,215,0,0.6);
+  }
+  .char-counter.over {
+    color: rgba(255,0,110,0.6);
+  }
+</style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+<div id="app"></div>
+<div id="toast-container"></div>
+
+<script>
+// ======== STARFIELD ========
+(function initStarfield() {
+  const canvas = document.getElementById('starfield');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  const STAR_COUNT = 120;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for (let i = 0; i < STAR_COUNT; i++) {
+    stars.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.2 + 0.3,
+      vx: (Math.random() - 0.5) * 0.15,
+      vy: (Math.random() - 0.5) * 0.15,
+      alpha: Math.random() * 0.5 + 0.2,
+      twinkle: Math.random() * Math.PI * 2,
+      twinkleSpeed: Math.random() * 0.02 + 0.005
+    });
+  }
+
+  function drawStars() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    stars.forEach(s => {
+      s.x += s.vx;
+      s.y += s.vy;
+      s.twinkle += s.twinkleSpeed;
+      if (s.x < 0) s.x = canvas.width;
+      if (s.x > canvas.width) s.x = 0;
+      if (s.y < 0) s.y = canvas.height;
+      if (s.y > canvas.height) s.y = 0;
+      const a = s.alpha * (0.6 + 0.4 * Math.sin(s.twinkle));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,220,255,${a})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(drawStars);
+  }
+  drawStars();
+})();
+
+// ======== STATE ========
+const state = {
+  screen: 0,
+  lifeStory: '',
+  weights: {
+    urgency: 7,
+    importance: 9,
+    impact: 8,
+    effort: 3,
+    enjoyment: 6
+  },
+  context: {
+    energy: 'Medium',
+    stress: 'Medium',
+    time: 'Some',
+    weather: 'Okay',
+    constraints: 'None'
+  },
+  tasks: [],
+  results: [],
+  showAddForm: false,
+  editForm: {
+    name: '',
+    category: 'Work',
+    description: '',
+    urgency: 5,
+    importance: 5,
+    impact: 5,
+    effort: 5,
+    enjoyment: 5
+  },
+  crunchDone: false,
+  expandedBreakdown: null
+};
+
+// ======== CONSTANTS ========
+const METRICS = [
+  { key: 'urgency', label: 'Urgency', icon: 'zap', desc: 'How much do deadlines drive you?', color: '#ff006e', colorEnd: '#ff4da6', gradient: 'linear-gradient(90deg, #ff006e, #ff4da6)', bg: 'rgba(255,0,110,0.15)', border: 'rgba(255,0,110,0.4)' },
+  { key: 'importance', label: 'Importance', icon: 'star', desc: 'How much does significance matter?', color: '#00f5a0', colorEnd: '#00d9ff', gradient: 'linear-gradient(90deg, #00f5a0, #00d9ff)', bg: 'rgba(0,245,160,0.15)', border: 'rgba(0,245,160,0.4)' },
+  { key: 'impact', label: 'Impact', icon: 'bar-chart-3', desc: 'How much do results drive your choices?', color: '#00d4ff', colorEnd: '#0099ff', gradient: 'linear-gradient(90deg, #00d4ff, #0099ff)', bg: 'rgba(0,212,255,0.15)', border: 'rgba(0,212,255,0.4)' },
+  { key: 'effort', label: 'Effort', icon: 'sliders-horizontal', desc: 'Do you prefer easy wins or big pushes?', color: '#ffd700', colorEnd: '#ff8c00', gradient: 'linear-gradient(90deg, #ffd700, #ff8c00)', bg: 'rgba(255,215,0,0.15)', border: 'rgba(255,215,0,0.4)' },
+  { key: 'enjoyment', label: 'Enjoyment', icon: 'smile', desc: 'How much does fun factor in?', color: '#a855f7', colorEnd: '#7c3aed', gradient: 'linear-gradient(90deg, #a855f7, #7c3aed)', bg: 'rgba(168,85,247,0.15)', border: 'rgba(168,85,247,0.4)' }
+];
+
+const CATEGORIES = {
+  Work:     { bg: 'rgba(0,212,255,0.2)',   border: 'rgba(0,212,255,0.5)',   text: '#00d4ff'  },
+  Personal: { bg: 'rgba(168,85,247,0.2)',  border: 'rgba(168,85,247,0.5)',  text: '#a855f7'  },
+  Health:   { bg: 'rgba(0,245,160,0.2)',   border: 'rgba(0,245,160,0.5)',   text: '#00f5a0'  },
+  Finance:  { bg: 'rgba(255,215,0,0.2)',   border: 'rgba(255,215,0,0.5)',   text: '#ffd700'  },
+  Learning: { bg: 'rgba(0,153,255,0.2)',   border: 'rgba(0,153,255,0.5)',   text: '#0099ff'  },
+  Creative: { bg: 'rgba(255,0,110,0.2)',   border: 'rgba(255,0,110,0.5)',   text: '#ff006e'  },
+  Social:   { bg: 'rgba(255,140,0,0.2)',   border: 'rgba(255,140,0,0.5)',   text: '#ff8c00'  },
+  AI:       { bg: 'rgba(0,212,255,0.2)',   border: 'rgba(0,212,255,0.5)',   text: '#00d4ff'  }
+};
+
+const CONTEXT_OPTIONS = [
+  { key: 'energy', label: 'Energy', icon: '⚡', options: ['Low', 'Medium', 'High'] },
+  { key: 'stress', label: 'Stress', icon: '🧠', options: ['Low', 'Medium', 'High'] },
+  { key: 'time', label: 'Time', icon: '⏰', options: ['Plenty', 'Some', 'Tight'] },
+  { key: 'weather', label: 'Weather', icon: '🌤️', options: ['Great', 'Okay', 'Bad'] },
+  { key: 'constraints', label: 'Personal Constraints', icon: '🧩', options: ['None', 'Some', 'Many'] }
+];
+
+const STEP_NAV = [
+  { label: 'Values', icon: 'clipboard-list', screen: 1 },
+  { label: 'Tasks', icon: 'list-plus', screen: 2 },
+  { label: 'Crunch', icon: 'cpu', screen: 3 },
+  { label: 'Results', icon: 'trophy', screen: 4 }
+];
+
+// ======== HELPERS ========
+function catBadge(cat) {
+  const c = CATEGORIES[cat] || CATEGORIES.Work;
+  return `<span class="cat-badge" style="background:${c.bg};border:1px solid ${c.border};color:${c.text}">${cat}</span>`;
+}
+
+function goTo(screen) {
+  if (screen < state.screen || screen === state.screen + 1) {
+    state.screen = screen;
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function setWeight(key, val) {
+  state.weights[key] = parseInt(val);
+  document.getElementById(`val-${key}`).textContent = val + '/10';
+  updateSliderTrack(key, val);
+}
+
+function updateSliderTrack(key, val) {
+  const slider = document.getElementById(`slider-${key}`);
+  if (!slider) return;
+  const pct = ((val - 1) / 9) * 100;
+  const m = METRICS.find(m => m.key === key);
+  slider.style.background = `linear-gradient(90deg, ${m.color} 0%, ${m.colorEnd} ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
+}
+
+function setContext(key, val) {
+  state.context[key] = val;
+  render();
+}
+
+function setEditField(key, val) {
+  state.editForm[key] = val;
+  if (['urgency','importance','impact','effort','enjoyment'].includes(key)) {
+    state.editForm[key] = parseInt(val);
+    const el = document.getElementById(`edit-val-${key}`);
+    if (el) el.textContent = val + '/10';
+    updateEditSliderTrack(key, val);
+  }
+}
+
+function updateEditSliderTrack(key, val) {
+  const slider = document.getElementById(`edit-slider-${key}`);
+  if (!slider) return;
+  const pct = ((val - 1) / 9) * 100;
+  const m = METRICS.find(m => m.key === key);
+  slider.style.background = `linear-gradient(90deg, ${m.color} 0%, ${m.colorEnd} ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
+}
+
+function toggleAddForm() {
+  state.showAddForm = !state.showAddForm;
+  if (state.showAddForm) {
+    state.editForm = { name: '', category: 'Work', description: '', urgency: 5, importance: 5, impact: 5, effort: 5, enjoyment: 5 };
+  }
+  render();
+}
+
+function addTask() {
+  const f = state.editForm;
+  if (!f.name.trim()) return;
+  state.tasks.push({
+    id: Date.now(),
+    name: f.name.trim(),
+    category: f.category,
+    description: f.description.trim(),
+    urgency: f.urgency,
+    importance: f.importance,
+    impact: f.impact,
+    effort: f.effort,
+    enjoyment: f.enjoyment
+  });
+  state.showAddForm = false;
+  render();
+}
+
+function deleteTask(id) {
+  state.tasks = state.tasks.filter(t => t.id !== id);
+  render();
+}
+
+function toggleBreakdown(id) {
+  state.expandedBreakdown = state.expandedBreakdown === id ? null : id;
+  render();
+}
+
+// ======== TOAST SYSTEM ========
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification' + (type === 'error' ? ' error' : '');
+  const iconName = type === 'error' ? 'alert-circle' : 'check-circle-2';
+  toast.innerHTML = `<i data-lucide="${iconName}" style="width:18px;height:18px;flex-shrink:0;"></i><span>${message}</span>`;
+  container.appendChild(toast);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  setTimeout(() => {
+    toast.classList.add('dismissing');
+    setTimeout(() => { toast.remove(); }, 300);
+  }, 3000);
+}
+
+// ======== LIFE STORY ========
+function setLifeStory(val) {
+  state.lifeStory = val;
+  const counter = document.getElementById('life-story-counter');
+  if (counter) {
+    const len = val.length;
+    counter.textContent = len + ' / 500 characters';
+    counter.className = 'char-counter' + (len > 500 ? ' over' : len > 400 ? ' warn' : '');
+  }
+}
+
+// ======== IMPORT SESSION ========
+function handleImportFile(file) {
+  if (!file || !file.name.endsWith('.json')) {
+    showToast('Please upload a valid .json file', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      // Validate it's a Crunchy export
+      if (!data.weights || !data.context || !data.rankedTasks) {
+        showToast('Invalid Crunchy export file. Missing required fields.', 'error');
+        return;
+      }
+      // Restore weights
+      if (data.weights) {
+        state.weights = {
+          urgency: data.weights.urgency || 7,
+          importance: data.weights.importance || 9,
+          impact: data.weights.impact || 8,
+          effort: data.weights.effort || 3,
+          enjoyment: data.weights.enjoyment || 6
+        };
+      }
+      // Restore context
+      if (data.context) {
+        state.context = {
+          energy: data.context.energy || 'Medium',
+          stress: data.context.stress || 'Medium',
+          time: data.context.time || 'Some',
+          weather: data.context.weather || 'Okay',
+          constraints: data.context.constraints || 'None'
+        };
+      }
+      // Restore life story
+      if (data.lifeStory) {
+        state.lifeStory = data.lifeStory;
+      }
+      // Restore tasks from rankedTasks
+      if (data.rankedTasks && data.rankedTasks.length > 0) {
+        state.tasks = data.rankedTasks.map(t => ({
+          id: Date.now() + Math.random() * 10000,
+          name: t.name,
+          category: t.category || 'Work',
+          description: t.description || '',
+          urgency: t.metrics ? t.metrics.urgency : (t.urgency || 5),
+          importance: t.metrics ? t.metrics.importance : (t.importance || 5),
+          impact: t.metrics ? t.metrics.impact : (t.impact || 5),
+          effort: t.metrics ? t.metrics.effort : (t.effort || 5),
+          enjoyment: t.metrics ? t.metrics.enjoyment : (t.enjoyment || 5)
+        }));
+      }
+      // Navigate to Step 2
+      state.screen = 2;
+      render();
+      showToast(`Session restored! ${state.tasks.length} task${state.tasks.length !== 1 ? 's' : ''} loaded.`);
+    } catch (err) {
+      showToast('Could not parse file. Please check the JSON format.', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function triggerFileUpload() {
+  const input = document.getElementById('import-file-input');
+  if (input) input.click();
+}
+
+// ======== RANKING ALGORITHM ========
+function crunchTasks() {
+  const w = state.weights;
+  const totalWeight = w.urgency + w.importance + w.impact + w.effort + w.enjoyment;
+
+  state.results = state.tasks.map(task => {
+    let raw = (
+      task.urgency * w.urgency +
+      task.importance * w.importance +
+      task.impact * w.impact +
+      (11 - task.effort) * w.effort +
+      task.enjoyment * w.enjoyment
+    ) / totalWeight;
+
+    // Life context modifiers
+    let multiplier = 1;
+    const ctx = state.context;
+
+    // Energy
+    if (ctx.energy === 'Low') {
+      if (task.effort <= 4) multiplier *= 1.15;
+      if (task.effort >= 7) multiplier *= 0.90;
+    } else if (ctx.energy === 'High') {
+      if (task.effort >= 7) multiplier *= 1.10;
+    }
+
+    // Stress
+    if (ctx.stress === 'High') {
+      if (task.enjoyment >= 7) multiplier *= 1.15;
+      if (task.effort <= 4) multiplier *= 1.10;
+    }
+
+    // Time
+    if (ctx.time === 'Tight') {
+      if (task.effort <= 4) multiplier *= 1.20;
+      if (task.effort >= 7) multiplier *= 0.85;
+    } else if (ctx.time === 'Plenty') {
+      if (task.impact >= 7) multiplier *= 1.05;
+    }
+
+    // Weather
+    if (ctx.weather === 'Bad') {
+      if (['Work', 'Finance', 'Learning', 'AI'].includes(task.category)) multiplier *= 1.05;
+    }
+
+    // Constraints
+    if (ctx.constraints === 'Many') {
+      if (task.effort <= 4) multiplier *= 1.10;
+      if (task.effort >= 7) multiplier *= 0.90;
+    }
+
+    const finalScore = raw * multiplier;
+
+    // Metric contributions
+    const contributions = {
+      urgency: (task.urgency * w.urgency) / totalWeight,
+      importance: (task.importance * w.importance) / totalWeight,
+      impact: (task.impact * w.impact) / totalWeight,
+      effort: ((11 - task.effort) * w.effort) / totalWeight,
+      enjoyment: (task.enjoyment * w.enjoyment) / totalWeight
+    };
+
+    return {
+      ...task,
+      score: finalScore,
+      rawScore: raw,
+      multiplier,
+      contributions,
+      explanation: ''
+    };
+  });
+
+  // Sort descending
+  state.results.sort((a, b) => b.score - a.score);
+
+  // Generate explanations
+  state.results.forEach((task, idx) => {
+    task.explanation = generateExplanation(task, idx, state.results, state.context);
+  });
+}
+
+function generateExplanation(task, rank, allResults, ctx) {
+  const contribs = task.contributions;
+  const sorted = Object.entries(contribs).sort((a, b) => b[1] - a[1]);
+  const top1 = sorted[0][0];
+  const top2 = sorted[1][0];
+  const sentences = [];
+
+  const metricLabels = { urgency: 'urgency', importance: 'importance', impact: 'impact', effort: 'low effort', enjoyment: 'enjoyment' };
+
+  if (rank === 0) {
+    if (top1 === 'importance' && top2 === 'impact') {
+      sentences.push('High importance and strong impact make this your top priority right now.');
+    } else if (top1 === 'urgency') {
+      sentences.push('Pressing urgency paired with strong ' + metricLabels[top2] + ' puts this at the top of your list.');
+    } else if (top1 === 'effort') {
+      sentences.push('Low effort with solid ' + metricLabels[top2] + ' — a quick win you shouldn\'t skip.');
+    } else {
+      sentences.push(`Strong ${metricLabels[top1]} and ${metricLabels[top2]} make this your clear top priority.`);
+    }
+  } else if (rank === allResults.length - 1) {
+    const lowest = sorted[sorted.length - 1][0];
+    sentences.push(`Despite its ${metricLabels[top1]}, lower ${metricLabels[lowest] === 'low effort' ? 'ease' : metricLabels[lowest]} puts this after more pressing tasks.`);
+  } else {
+    if (task.effort <= 4 && contribs.effort > contribs.urgency) {
+      sentences.push(`Low effort with solid ${metricLabels[top1]} — a quick win you shouldn't skip.`);
+    } else if (task.effort >= 7 && (contribs.impact > 1.5 || contribs.importance > 1.5)) {
+      sentences.push('High effort task, but the impact and importance justify the push.');
+    } else {
+      sentences.push(`Solid ${metricLabels[top1]} and ${metricLabels[top2]} earn this a mid-range priority slot.`);
+    }
+  }
+
+  // Context sentences
+  if (ctx.energy === 'Low' && task.effort <= 4) {
+    sentences.push('Your low energy level makes this manageable task a smart choice.');
+  } else if (ctx.energy === 'High' && task.effort >= 7) {
+    sentences.push('With high energy right now, you can handle this demanding task.');
+  }
+  if (ctx.stress === 'High' && task.enjoyment >= 7) {
+    sentences.push('Your current stress level makes this enjoyable task a smart next step.');
+  }
+  if (ctx.time === 'Tight' && task.effort <= 4) {
+    sentences.push('With limited time, this quick task fits well into your schedule.');
+  } else if (ctx.time === 'Tight' && task.effort >= 7) {
+    sentences.push('Tight time constraints make this harder to fit in right now.');
+  }
+
+  // Life story influence
+  if (state.lifeStory && state.lifeStory.trim().length > 0) {
+    const story = state.lifeStory.toLowerCase();
+    const cat = task.category.toLowerCase();
+    if (story.includes('health') && cat === 'health') {
+      sentences.push('This aligns with the health focus you mentioned in your life context.');
+    } else if ((story.includes('freelanc') || story.includes('client')) && cat === 'work') {
+      sentences.push('Given your work situation, this task is especially relevant right now.');
+    } else if (story.includes('learn') && cat === 'learning') {
+      sentences.push('This supports the learning goals you described.');
+    } else if ((story.includes('creat') || story.includes('side project')) && cat === 'creative') {
+      sentences.push('This connects to the creative pursuits you mentioned.');
+    } else if (story.includes('financ') && cat === 'finance') {
+      sentences.push('This ties into the financial priorities you shared.');
+    } else if ((story.includes('friend') || story.includes('social') || story.includes('family')) && cat === 'social') {
+      sentences.push('This relates to the relationships you mentioned valuing.');
+    }
+  }
+
+  // Cap at 3 sentences
+  return sentences.slice(0, 3).join(' ');
+}
+
+// ======== RENDER ========
+function render() {
+  const app = document.getElementById('app');
+  let html = '';
+
+  if (state.screen === 0) {
+    html = renderSplash();
+  } else {
+    html = renderStepNav() + '<div style="max-width:1100px;margin:0 auto;padding:0 20px 60px;">';
+    if (state.screen === 1) html += renderStep1();
+    else if (state.screen === 2) html += renderStep2();
+    else if (state.screen === 3) html += renderStep3();
+    else if (state.screen === 4) html += renderStep4();
+    html += '</div>';
+  }
+
+  app.innerHTML = html;
+
+  // After render hooks
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  // Update slider tracks on step 1
+  if (state.screen === 1) {
+    METRICS.forEach(m => {
+      updateSliderTrack(m.key, state.weights[m.key]);
+    });
+  }
+
+  // Update edit form slider tracks
+  if (state.screen === 2 && state.showAddForm) {
+    setTimeout(() => {
+      METRICS.forEach(m => {
+        updateEditSliderTrack(m.key, state.editForm[m.key]);
+      });
+    }, 50);
+  }
+
+  // Crunching animation
+  if (state.screen === 3 && !state.crunchDone) {
+    runCrunchAnimation();
+  }
+
+  // Setup drag-and-drop for upload zone
+  if (state.screen === 0) {
+    setTimeout(() => {
+      const dropZone = document.getElementById('upload-drop-zone');
+      if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => {
+          dropZone.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('dragover');
+          const file = e.dataTransfer.files[0];
+          handleImportFile(file);
+        });
+      }
+    }, 50);
+  }
+}
+
+// ======== SPLASH ========
+function renderSplash() {
+  return `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 20px;text-align:center;">
+      <div class="animate-fade-in-up" style="animation-delay:0.1s;">
+        <h1 class="glow-text" style="font-size:clamp(3rem,8vw,5rem);font-weight:900;letter-spacing:-2px;margin-bottom:16px;line-height:1.1;">
+          The Crunchy
+        </h1>
+        <p style="font-size:clamp(1.1rem,3vw,1.4rem);color:rgba(255,255,255,0.7);margin-bottom:8px;font-weight:500;">
+          Time crunched? Let's crunch it.
+        </p>
+        <p style="font-size:clamp(0.85rem,2vw,1rem);color:rgba(255,255,255,0.4);margin-bottom:48px;max-width:400px;">
+          A smarter way to prioritize what actually matters.
+        </p>
+        <button class="btn-accent" onclick="state.screen=1;render();window.scrollTo({top:0});" style="font-size:18px;padding:16px 48px;">
+          Get Started
+        </button>
+
+        <!-- Upload Previous Session -->
+        <div style="margin-top:40px;">
+          <p style="color:rgba(255,255,255,0.3);font-size:13px;margin-bottom:16px;">or continue where you left off</p>
+          <div id="upload-drop-zone" class="upload-zone" onclick="triggerFileUpload()" style="max-width:400px;margin:0 auto;">
+            <i data-lucide="upload" style="width:28px;height:28px;color:rgba(0,212,255,0.5);margin:0 auto 10px;display:block;"></i>
+            <p style="color:rgba(255,255,255,0.5);font-size:14px;font-weight:600;margin-bottom:4px;">Drop a Crunchy .json file here</p>
+            <p style="color:rgba(255,255,255,0.3);font-size:12px;">or click to browse</p>
+          </div>
+          <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="handleImportFile(this.files[0])">
+        </div>
+      </div>
+    </div>`;
+}
+
+// ======== STEP NAV ========
+function renderStepNav() {
+  let html = `<div style="display:flex;align-items:center;justify-content:center;gap:0;padding:24px 20px 12px;flex-wrap:wrap;">`;
+  STEP_NAV.forEach((step, i) => {
+    const isCompleted = state.screen > step.screen;
+    const isActive = state.screen === step.screen;
+    const cls = isCompleted ? 'completed' : isActive ? 'active' : '';
+    const clickable = isCompleted ? `onclick="goTo(${step.screen})"` : '';
+    html += `<div class="step-nav-item ${cls}" ${clickable}>
+      <div class="step-nav-icon">
+        ${isCompleted ? '<i data-lucide="check" style="width:16px;height:16px;color:#00f5a0;"></i>' : `<i data-lucide="${step.icon}" style="width:16px;height:16px;"></i>`}
+      </div>
+      <span class="nav-label">${step.label}</span>
+    </div>`;
+    if (i < STEP_NAV.length - 1) {
+      const cCls = isCompleted ? 'completed' : isActive ? 'active' : '';
+      html += `<div class="step-connector ${cCls}"></div>`;
+    }
+  });
+  html += '</div>';
+  return html;
+}
+
+// ======== STEP 1 ========
+function renderStep1() {
+  let html = `<div class="animate-fade-in-up">`;
+  html += `<div style="text-align:center;margin-bottom:36px;">
+    <div class="step-badge" style="margin-bottom:12px;">STEP 1</div>
+    <h2 style="font-size:clamp(1.5rem,4vw,2.2rem);font-weight:800;margin-bottom:8px;">Tell the system what you value</h2>
+    <p class="text-body" style="font-size:15px;">Rate decision-making metrics out of 10</p>
+  </div>`;
+
+  // === Feature 3: Life Story Section ===
+  html += `<div class="glass-card-glow" style="margin-bottom:28px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <div class="metric-icon-circle" style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.4);">
+        <i data-lucide="heart" style="width:18px;height:18px;color:#a855f7;"></i>
+      </div>
+      <div>
+        <h3 style="font-weight:700;font-size:18px;margin-bottom:2px;">Tell me about your life</h3>
+        <p style="color:rgba(255,255,255,0.4);font-size:13px;">What's going on? What are your goals? What matters to you right now?</p>
+      </div>
+    </div>
+    <textarea class="life-story-textarea" rows="4"
+      placeholder="I'm a freelancer juggling client work and a side project. I want to focus on health but keep getting pulled into meetings..."
+      oninput="setLifeStory(this.value)">${escHtml(state.lifeStory)}</textarea>
+    <div class="char-counter${state.lifeStory.length > 500 ? ' over' : state.lifeStory.length > 400 ? ' warn' : ''}" id="life-story-counter">${state.lifeStory.length} / 500 characters</div>
+  </div>`;
+
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start;" class="step1-grid">`;
+
+  // Left — Metric sliders
+  html += `<div class="glass-card-glow">`;
+  METRICS.forEach(m => {
+    html += `
+      <div style="margin-bottom:24px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+          <div class="metric-icon-circle" style="background:${m.bg};border:1px solid ${m.border};">
+            <i data-lucide="${m.icon}" style="width:18px;height:18px;color:${m.color};"></i>
+          </div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-weight:700;font-size:15px;">${m.label}</span>
+              <span id="val-${m.key}" style="font-weight:700;color:${m.color};font-size:14px;">${state.weights[m.key]}/10</span>
+            </div>
+            <div style="color:rgba(255,255,255,0.4);font-size:12px;">${m.desc}</div>
+          </div>
+        </div>
+        <input type="range" id="slider-${m.key}" min="1" max="10" value="${state.weights[m.key]}"
+          oninput="setWeight('${m.key}', this.value)">
+      </div>`;
+  });
+  html += `</div>`;
+
+  // Right — Life Context
+  html += `<div class="glass-card-glow">
+    <h3 style="font-weight:700;font-size:18px;margin-bottom:4px;">Life Context</h3>
+    <p style="color:rgba(255,255,255,0.4);font-size:13px;margin-bottom:20px;">Context adjusts priority scoring</p>`;
+  CONTEXT_OPTIONS.forEach(opt => {
+    html += `<div style="margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px;">${opt.icon} ${opt.label}</div>
+      <div style="display:flex;gap:6px;">`;
+    opt.options.forEach(o => {
+      const sel = state.context[opt.key] === o ? 'selected' : '';
+      html += `<button class="ctx-btn ${sel}" onclick="setContext('${opt.key}','${o}')">${o}</button>`;
+    });
+    html += `</div></div>`;
+  });
+  html += `<p style="color:rgba(255,255,255,0.3);font-size:12px;font-style:italic;margin-top:12px;">Your priorities change. The system adapts.</p>`;
+  html += `</div>`;
+
+  html += `</div>`; // grid
+
+  html += `<div style="text-align:center;margin-top:36px;">
+    <button class="btn-accent" onclick="goTo(2)">Continue</button>
+  </div>`;
+
+  html += `</div>`;
+
+  // Responsive CSS override for grid
+  html += `<style>.step1-grid { grid-template-columns: 1fr 1fr; } @media(max-width:768px) { .step1-grid { grid-template-columns: 1fr !important; } }</style>`;
+
+  return html;
+}
+
+// ======== STEP 2 ========
+function renderStep2() {
+  let html = `<div class="animate-fade-in-up">`;
+  html += `<div style="text-align:center;margin-bottom:36px;">
+    <div class="step-badge" style="margin-bottom:12px;">STEP 2</div>
+    <h2 style="font-size:clamp(1.5rem,4vw,2.2rem);font-weight:800;margin-bottom:8px;">Dump your tasks. Add context.</h2>
+    <p class="text-body" style="font-size:15px;">No perfect planning. Just honest input.</p>
+  </div>`;
+
+  html += `<div class="glass-card-glow" style="margin-bottom:24px;">`;
+
+  // Task list
+  if (state.tasks.length === 0) {
+    html += `<div style="text-align:center;padding:40px 20px;color:rgba(255,255,255,0.3);">
+      <i data-lucide="inbox" style="width:40px;height:40px;margin:0 auto 12px;display:block;opacity:0.3;"></i>
+      <p>No tasks yet. Add at least 2 tasks to continue.</p>
+    </div>`;
+  } else {
+    state.tasks.forEach(task => {
+      html += `<div class="task-item" style="margin-bottom:10px;">
+        <div class="task-accent-bar"></div>
+        <div style="flex:1;padding-left:8px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+            <span style="font-weight:700;font-size:15px;">${escHtml(task.name)}</span>
+            ${catBadge(task.category)}
+          </div>
+          ${task.description ? `<p style="color:rgba(255,255,255,0.5);font-size:13px;margin-top:2px;">${escHtml(task.description)}</p>` : ''}
+          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+            ${METRICS.map(m => `<span style="font-size:11px;color:${m.color};">${m.label}: ${task[m.key]}</span>`).join('')}
+          </div>
+        </div>
+        <button class="delete-btn" onclick="deleteTask(${task.id})" title="Delete">
+          <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+        </button>
+      </div>`;
+    });
+  }
+
+  // Add task form toggle
+  html += `<div style="margin-top:16px;">`;
+  if (!state.showAddForm) {
+    html += `<button onclick="toggleAddForm()" style="display:flex;align-items:center;gap:8px;background:rgba(0,212,255,0.08);border:1px dashed rgba(0,212,255,0.3);border-radius:12px;padding:14px 20px;color:#00d4ff;cursor:pointer;width:100%;justify-content:center;font-weight:600;font-size:14px;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,212,255,0.15)'" onmouseout="this.style.background='rgba(0,212,255,0.08)'">
+      <i data-lucide="plus" style="width:18px;height:18px;"></i> Add task
+    </button>`;
+  } else {
+    html += renderAddTaskForm();
+  }
+  html += `</div>`;
+
+  html += `</div>`; // card
+
+  html += `<p style="text-align:center;color:rgba(255,255,255,0.3);font-size:13px;font-style:italic;margin-bottom:24px;">The system will figure it out.</p>`;
+
+  const canCrunch = state.tasks.length >= 2;
+  html += `<div style="text-align:center;">
+    <button class="btn-accent" onclick="startCrunch()" ${canCrunch ? '' : 'disabled'} style="font-size:18px;padding:16px 48px;">
+      <span style="display:flex;align-items:center;gap:10px;justify-content:center;">
+        <i data-lucide="zap" style="width:20px;height:20px;"></i> Crunch It
+      </span>
+    </button>
+    ${!canCrunch ? '<p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:8px;">Add at least 2 tasks to proceed</p>' : ''}
+  </div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function renderAddTaskForm() {
+  const f = state.editForm;
+  let html = `<div class="glass-card" style="margin-top:8px;">
+    <h4 style="font-weight:700;font-size:16px;margin-bottom:16px;">New Task</h4>
+    <div style="display:grid;gap:14px;margin-bottom:16px;">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);display:block;margin-bottom:4px;">Task Name</label>
+        <input class="form-input" type="text" placeholder="e.g. Finish quarterly report" value="${escHtml(f.name)}" oninput="setEditField('name',this.value)">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);display:block;margin-bottom:4px;">Category</label>
+        <select class="form-input" onchange="setEditField('category',this.value)">
+          ${Object.keys(CATEGORIES).map(c => `<option value="${c}" ${f.category===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);display:block;margin-bottom:4px;">Description</label>
+        <textarea class="form-input" placeholder="Brief description..." oninput="setEditField('description',this.value)">${escHtml(f.description)}</textarea>
+      </div>
+    </div>
+    <h5 style="font-weight:700;font-size:14px;margin-bottom:12px;color:rgba(255,255,255,0.6);">Rate this task</h5>`;
+
+  const taskQuestions = {
+    urgency: 'How urgent is this?',
+    importance: 'How important is this?',
+    impact: 'What impact will completing it have?',
+    effort: 'How much effort will it take?',
+    enjoyment: 'How enjoyable is this?'
+  };
+
+  METRICS.forEach(m => {
+    html += `<div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <div class="metric-icon-circle" style="background:${m.bg};border:1px solid ${m.border};width:28px;height:28px;">
+          <i data-lucide="${m.icon}" style="width:13px;height:13px;color:${m.color};"></i>
+        </div>
+        <span style="font-size:13px;font-weight:600;flex:1;">${taskQuestions[m.key]}</span>
+        <span id="edit-val-${m.key}" style="font-weight:700;color:${m.color};font-size:13px;">${f[m.key]}/10</span>
+      </div>
+      <input type="range" id="edit-slider-${m.key}" min="1" max="10" value="${f[m.key]}"
+        oninput="setEditField('${m.key}', this.value)">
+    </div>`;
+  });
+
+  html += `<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+    <button class="btn-secondary" onclick="toggleAddForm()" style="padding:10px 20px;font-size:13px;">Cancel</button>
+    <button class="btn-accent" onclick="addTask()" style="padding:10px 24px;font-size:13px;">Add Task</button>
+  </div>`;
+  html += `</div>`;
+  return html;
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ======== STEP 3 — CRUNCH ANIMATION ========
+function startCrunch() {
+  state.crunchDone = false;
+  crunchTasks();
+  state.screen = 3;
+  render();
+}
+
+function renderStep3() {
+  let html = `<div class="animate-fade-in-up">`;
+  html += `<div style="text-align:center;margin-bottom:36px;">
+    <div class="step-badge" style="margin-bottom:12px;">STEP 3</div>
+    <h2 style="font-size:clamp(1.5rem,4vw,2.2rem);font-weight:800;margin-bottom:8px;">Let automation do the math</h2>
+    <p class="text-body" style="font-size:15px;">Let the AI compare your tasks for you.</p>
+  </div>`;
+
+  html += `<div class="glass-card-glow" style="min-height:350px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="crunch-arena">
+    <div style="display:flex;align-items:center;justify-content:center;gap:40px;width:100%;flex-wrap:wrap;">
+      <!-- Left: tasks flowing in -->
+      <div id="crunch-left" style="display:flex;flex-direction:column;gap:8px;opacity:0;transition:opacity 0.6s;">
+        ${state.tasks.map(t => `<div style="padding:8px 16px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);font-size:13px;font-weight:600;animation:slideInLeft 0.6s ease forwards;">${escHtml(t.name)}</div>`).join('')}
+      </div>
+      <!-- Center: orb -->
+      <div id="crunch-orb" style="opacity:0;transition:opacity 0.6s;">
+        <div class="crunch-orb">
+          <i data-lucide="cpu" style="width:36px;height:36px;color:#00d4ff;"></i>
+        </div>
+      </div>
+      <!-- Right: ranked result -->
+      <div id="crunch-right" style="display:flex;flex-direction:column;gap:8px;opacity:0;transition:opacity 0.6s;">
+        ${state.results.map((t, i) => `<div style="padding:8px 16px;border-radius:8px;background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.2);font-size:13px;font-weight:600;color:#00d4ff;animation:slideInRight 0.6s ease forwards;"><span style="margin-right:8px;opacity:0.5;">#${i+1}</span>${escHtml(t.name)}</div>`).join('')}
+      </div>
+    </div>
+    <!-- Progress -->
+    <div style="width:100%;max-width:400px;margin-top:28px;">
+      <div class="crunch-progress"><div class="crunch-progress-fill" id="crunch-progress-fill"></div></div>
+    </div>
+    <!-- Factor badges -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:20px;">
+      <span class="factor-badge" id="fb-quant">Quantitative</span>
+      <span class="factor-badge" id="fb-qual">Qualitative</span>
+      <span class="factor-badge" id="fb-money">Money Factors</span>
+      <span class="factor-badge" id="fb-nonmoney">Non-Money Factors</span>
+    </div>
+    <p style="color:rgba(255,255,255,0.3);font-size:13px;margin-top:20px;text-align:center;">Every task is evaluated against every other task.</p>
+  </div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function runCrunchAnimation() {
+  const left = document.getElementById('crunch-left');
+  const orb = document.getElementById('crunch-orb');
+  const right = document.getElementById('crunch-right');
+  const bar = document.getElementById('crunch-progress-fill');
+  const badges = ['fb-quant','fb-qual','fb-money','fb-nonmoney'];
+
+  // Timeline
+  setTimeout(() => { if (left) left.style.opacity = '1'; }, 200);
+  setTimeout(() => { if (bar) bar.style.width = '20%'; }, 300);
+  setTimeout(() => { if (orb) orb.style.opacity = '1'; }, 600);
+  setTimeout(() => { if (bar) bar.style.width = '40%'; }, 700);
+  setTimeout(() => {
+    const el = document.getElementById(badges[0]);
+    if (el) el.classList.add('lit');
+  }, 800);
+  setTimeout(() => { if (bar) bar.style.width = '55%'; }, 1000);
+  setTimeout(() => {
+    const el = document.getElementById(badges[1]);
+    if (el) el.classList.add('lit');
+  }, 1200);
+  setTimeout(() => { if (bar) bar.style.width = '70%'; }, 1400);
+  setTimeout(() => {
+    const el = document.getElementById(badges[2]);
+    if (el) el.classList.add('lit');
+  }, 1600);
+  setTimeout(() => { if (bar) bar.style.width = '85%'; }, 1800);
+  setTimeout(() => {
+    const el = document.getElementById(badges[3]);
+    if (el) el.classList.add('lit');
+  }, 2000);
+  setTimeout(() => { if (right) right.style.opacity = '1'; }, 2200);
+  setTimeout(() => { if (bar) bar.style.width = '100%'; }, 2500);
+  setTimeout(() => {
+    state.crunchDone = true;
+    state.screen = 4;
+    render();
+  }, 3200);
+}
+
+// ======== STEP 4 ========
+function renderStep4() {
+  const results = state.results;
+  const maxScore = results.length ? results[0].score : 1;
+
+  let html = `<div class="animate-fade-in-up">`;
+  html += `<div style="text-align:center;margin-bottom:36px;">
+    <div class="step-badge" style="margin-bottom:12px;">STEP 4</div>
+    <h2 style="font-size:clamp(1.5rem,4vw,2.2rem);font-weight:800;margin-bottom:8px;">Get the answer. Know why.</h2>
+    <p class="text-body" style="font-size:15px;">Less stress. Fewer guesses. Better decisions.</p>
+  </div>`;
+
+  html += `<div style="display:grid;grid-template-columns:1fr 1.5fr;gap:28px;align-items:start;" class="step4-grid">`;
+
+  // Left — Ranked list
+  html += `<div class="glass-card-glow">
+    <h3 style="font-weight:700;font-size:18px;margin-bottom:16px;">Priority Ranking</h3>`;
+  results.forEach((task, i) => {
+    html += `<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+      <div class="rank-number">${i + 1}</div>
+      <div>
+        <div style="font-weight:700;font-size:15px;">${escHtml(task.name)}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.4);">Score: ${task.score.toFixed(2)}</div>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Right — macOS window with explanations
+  html += `<div class="glass-card-glow" style="padding:0;overflow:hidden;">
+    <div style="padding:20px 24px 0;">
+      <div class="macos-dots">
+        <div class="macos-dot" style="background:#ff5f56;"></div>
+        <div class="macos-dot" style="background:#ffbd2e;"></div>
+        <div class="macos-dot" style="background:#27c93f;"></div>
+      </div>
+      <h3 style="font-weight:700;font-size:18px;margin-bottom:4px;">Today's Priority Order</h3>
+      <p style="color:rgba(255,255,255,0.4);font-size:13px;margin-bottom:20px;">Here's the smart list we generated for you, with explanations for each ranking:</p>
+    </div>
+    <div style="padding:0 24px 24px;">`;
+  results.forEach((task, i) => {
+    html += `<div class="explanation-card">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <div style="margin-top:2px;color:#00f5a0;flex-shrink:0;">
+          <i data-lucide="check-circle-2" style="width:20px;height:20px;"></i>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <span style="font-weight:700;font-size:15px;">${escHtml(task.name)}</span>
+            ${catBadge(task.category)}
+          </div>
+          <p style="color:rgba(255,255,255,0.55);font-size:13px;line-height:1.6;">${task.explanation}</p>
+        </div>
+      </div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  html += `</div>`; // grid
+
+  // Score Breakdown
+  html += `<div class="glass-card-glow" style="margin-top:28px;">
+    <h3 style="font-weight:700;font-size:18px;margin-bottom:4px;">Score Breakdown</h3>
+    <p style="color:rgba(255,255,255,0.4);font-size:13px;margin-bottom:20px;">Tap a task to see how each metric contributed.</p>`;
+  results.forEach((task, i) => {
+    const pct = (task.score / maxScore) * 100;
+    const isOpen = state.expandedBreakdown === task.id;
+    html += `<div class="breakdown-row" onclick="toggleBreakdown(${task.id})">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+        <div class="rank-number" style="width:28px;height:28px;font-size:13px;">${i + 1}</div>
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-weight:700;font-size:14px;">${escHtml(task.name)}</span>
+              ${catBadge(task.category)}
+            </div>
+            <span style="font-weight:700;font-size:14px;color:#00d4ff;">${task.score.toFixed(2)}</span>
+          </div>
+          <div class="score-bar-track">
+            <div class="score-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,#00d4ff,#0099ff);"></div>
+          </div>
+        </div>
+        <i data-lucide="${isOpen ? 'chevron-up' : 'chevron-down'}" style="width:16px;height:16px;color:rgba(255,255,255,0.3);flex-shrink:0;"></i>
+      </div>
+      <div class="breakdown-details ${isOpen ? 'open' : ''}">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding-top:8px;">
+          ${METRICS.map(m => {
+            const val = task.contributions[m.key];
+            const maxC = Math.max(...Object.values(task.contributions));
+            const barPct = maxC > 0 ? (val / maxC) * 100 : 0;
+            return `<div style="text-align:center;">
+              <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:4px;">${m.label}</div>
+              <div style="height:4px;border-radius:2px;background:rgba(255,255,255,0.06);overflow:hidden;">
+                <div style="height:100%;width:${barPct}%;border-radius:2px;background:${m.gradient};"></div>
+              </div>
+              <div style="font-size:11px;font-weight:700;color:${m.color};margin-top:4px;">${val.toFixed(1)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        ${task.multiplier !== 1 ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.4);">Context modifier: ×${task.multiplier.toFixed(2)}</div>` : ''}
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  html += `<p style="text-align:center;color:rgba(255,255,255,0.3);font-size:13px;font-style:italic;margin-top:20px;margin-bottom:24px;">Clear insights. Delivered by email.</p>`;
+
+  // Buttons — Start Over + 3 Export buttons
+  html += `<div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;">
+    <button class="btn-secondary" onclick="resetAll()">
+      <span style="display:flex;align-items:center;gap:8px;"><i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i> Start Over</span>
+    </button>
+  </div>`;
+
+  html += `<div class="export-btn-group">
+    <button class="export-btn" onclick="exportJSON()">
+      <i data-lucide="file-json" style="width:18px;height:18px;"></i> Export JSON
+    </button>
+    <button class="export-btn excel" onclick="exportExcel()">
+      <i data-lucide="file-spreadsheet" style="width:18px;height:18px;"></i> Export Excel
+    </button>
+    <button class="export-btn doc" onclick="exportDOC()">
+      <i data-lucide="file-text" style="width:18px;height:18px;"></i> Export DOC
+    </button>
+  </div>`;
+
+  html += `</div>`;
+
+  html += `<style>.step4-grid { grid-template-columns: 1fr 1.5fr; } @media(max-width:768px) { .step4-grid { grid-template-columns: 1fr !important; } }</style>`;
+
+  return html;
+}
+
+// ======== ACTIONS ========
+function resetAll() {
+  state.screen = 0;
+  state.lifeStory = '';
+  state.weights = { urgency: 7, importance: 9, impact: 8, effort: 3, enjoyment: 6 };
+  state.context = { energy: 'Medium', stress: 'Medium', time: 'Some', weather: 'Okay', constraints: 'None' };
+  state.tasks = [];
+  state.results = [];
+  state.showAddForm = false;
+  state.crunchDone = false;
+  state.expandedBreakdown = null;
+  render();
+  window.scrollTo({ top: 0 });
+}
+
+// ======== EXPORT: JSON ========
+function exportJSON() {
+  const data = {
+    generatedAt: new Date().toISOString(),
+    lifeStory: state.lifeStory,
+    weights: state.weights,
+    context: state.context,
+    rankedTasks: state.results.map((t, i) => ({
+      rank: i + 1,
+      name: t.name,
+      category: t.category,
+      description: t.description,
+      score: parseFloat(t.score.toFixed(3)),
+      explanation: t.explanation,
+      metrics: {
+        urgency: t.urgency,
+        importance: t.importance,
+        impact: t.impact,
+        effort: t.effort,
+        enjoyment: t.enjoyment
+      },
+      contributions: Object.fromEntries(Object.entries(t.contributions).map(([k,v]) => [k, parseFloat(v.toFixed(3))]))
+    }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, 'the-crunchy-results.json');
+}
+
+// ======== EXPORT: EXCEL (CSV) ========
+function exportExcel() {
+  const headers = ['Rank', 'Task Name', 'Category', 'Description', 'Score', 'Urgency', 'Importance', 'Impact', 'Effort', 'Enjoyment', 'Explanation', 'Context Modifier'];
+  const rows = state.results.map((t, i) => [
+    i + 1,
+    csvEscape(t.name),
+    csvEscape(t.category),
+    csvEscape(t.description || ''),
+    t.score.toFixed(3),
+    t.urgency,
+    t.importance,
+    t.impact,
+    t.effort,
+    t.enjoyment,
+    csvEscape(t.explanation),
+    t.multiplier.toFixed(2)
+  ]);
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  // Add BOM for Excel UTF-8 compatibility
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, 'the-crunchy-results.csv');
+}
+
+function csvEscape(str) {
+  if (!str) return '""';
+  const s = String(str);
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+// ======== EXPORT: DOC ========
+function exportDOC() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Build weights summary
+  const weightsSummary = METRICS.map(m => `<li><strong>${m.label}:</strong> ${state.weights[m.key]}/10</li>`).join('');
+
+  // Build context summary
+  const contextSummary = CONTEXT_OPTIONS.map(o => `<li><strong>${o.label}:</strong> ${state.context[o.key]}</li>`).join('');
+
+  // Build life story section
+  const lifeStorySection = state.lifeStory.trim()
+    ? `<h2 style="color:#333;margin-top:24px;">Life Story</h2><p style="color:#555;line-height:1.6;background:#f8f9fa;padding:12px 16px;border-radius:8px;border-left:4px solid #0099ff;">${escHtml(state.lifeStory).replace(/\n/g, '<br>')}</p>`
+    : '';
+
+  // Build ranked task table
+  let taskRows = '';
+  state.results.forEach((t, i) => {
+    taskRows += `<tr>
+      <td style="padding:8px 12px;border:1px solid #ddd;text-align:center;font-weight:bold;">${i + 1}</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;font-weight:bold;">${escHtml(t.name)}</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;">${escHtml(t.category)}</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;text-align:center;">${t.score.toFixed(2)}</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;text-align:center;">${t.urgency}</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;text-align:center;">${t.importance}</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;text-align:center;">${t.impact}</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;text-align:center;">${t.effort}</td>
+      <td style="padding:8px 12px;border:1px solid #ddd;text-align:center;">${t.enjoyment}</td>
+    </tr>`;
+  });
+
+  // Build explanations
+  let explanations = '';
+  state.results.forEach((t, i) => {
+    explanations += `
+      <div style="margin-bottom:16px;padding:12px 16px;border-left:4px solid #0099ff;background:#f8f9fa;border-radius:0 8px 8px 0;">
+        <p style="margin:0 0 4px;"><strong>#${i + 1} — ${escHtml(t.name)}</strong> <span style="color:#888;">(${escHtml(t.category)})</span></p>
+        <p style="margin:0;color:#555;font-size:14px;">${t.explanation}</p>
+        ${t.description ? `<p style="margin:4px 0 0;color:#999;font-size:13px;font-style:italic;">${escHtml(t.description)}</p>` : ''}
+      </div>`;
+  });
+
+  const docContent = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:w="urn:schemas-microsoft-com:office:word"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8">
+      <title>The Crunchy — Priority Report</title>
+      <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+      <style>
+        body { font-family: Calibri, Arial, sans-serif; color: #222; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { color: #0099ff; border-bottom: 3px solid #0099ff; padding-bottom: 8px; }
+        h2 { color: #333; margin-top: 28px; }
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th { background: #0099ff; color: white; padding: 10px 12px; border: 1px solid #0088dd; text-align: left; }
+      </style>
+    </head>
+    <body>
+      <h1>The Crunchy — Priority Report</h1>
+      <p style="color:#888;font-size:14px;">Generated on ${dateStr}</p>
+
+      <h2>Value Weights</h2>
+      <ul>${weightsSummary}</ul>
+
+      <h2>Life Context</h2>
+      <ul>${contextSummary}</ul>
+
+      ${lifeStorySection}
+
+      <h2>Priority Rankings</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:center;">Rank</th>
+            <th>Task</th>
+            <th>Category</th>
+            <th style="text-align:center;">Score</th>
+            <th style="text-align:center;">Urg</th>
+            <th style="text-align:center;">Imp</th>
+            <th style="text-align:center;">Imp.</th>
+            <th style="text-align:center;">Eff</th>
+            <th style="text-align:center;">Enj</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${taskRows}
+        </tbody>
+      </table>
+
+      <h2>Explanations</h2>
+      ${explanations}
+
+      <hr style="margin-top:32px;border:none;border-top:1px solid #ddd;">
+      <p style="color:#aaa;font-size:12px;text-align:center;">Generated by The Crunchy — Smart Task Prioritization</p>
+    </body>
+    </html>`;
+
+  const blob = new Blob([docContent], { type: 'application/msword' });
+  downloadBlob(blob, 'the-crunchy-report.doc');
+}
+
+// ======== DOWNLOAD HELPER ========
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ======== INIT ========
+render();
+</script>
+</body>
+</html>
