@@ -793,14 +793,6 @@ function setEditField(key, val) {
   state.editForm[key] = val;
 }
 
-function updateEditSliderTrack(key, val) {
-  const slider = document.getElementById(`edit-slider-${key}`);
-  if (!slider) return;
-  const pct = ((val - 1) / 9) * 100;
-  const m = METRICS.find(m => m.key === key);
-  slider.style.background = `linear-gradient(90deg, ${m.color} 0%, ${m.colorEnd} ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
-}
-
 function toggleAddForm() {
   state.showAddForm = !state.showAddForm;
   if (state.showAddForm) {
@@ -1202,20 +1194,6 @@ function render() {
     });
   }
 
-  // Update edit form slider tracks
-  if (state.screen === 2 && state.showAddForm) {
-    setTimeout(() => {
-      METRICS.forEach(m => {
-        updateEditSliderTrack(m.key, state.editForm[m.key]);
-      });
-    }, 50);
-  }
-
-  // Crunching animation
-  if (state.screen === 3 && !state.crunchDone) {
-    runCrunchAnimation();
-  }
-
   // Setup drag-and-drop for upload zone
   if (state.screen === 0) {
     setTimeout(() => {
@@ -1236,6 +1214,11 @@ function render() {
         });
       }
     }, 50);
+  }
+
+  // Crunching animation
+  if (state.screen === 3 && !state.crunchDone) {
+    runCrunchAnimation();
   }
 }
 
