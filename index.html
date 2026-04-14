@@ -633,15 +633,6 @@
 <script>
 // ======== STARFIELD ========
 (function initStarfield() {
-  // Load LLM key from localStorage
-  if (typeof localStorage !== 'undefined') {
-    const savedKey = localStorage.getItem('crunchyLLMKey');
-    if (savedKey) {
-      state.llmApiKey = savedKey;
-      state.llmEnabled = true;
-    }
-  }
-
   const canvas = document.getElementById('starfield');
   const ctx = canvas.getContext('2d');
   let stars = [];
@@ -720,6 +711,15 @@ const state = {
   crunchDone: false,
   expandedBreakdown: null
 };
+
+// Load LLM key from localStorage
+if (typeof localStorage !== 'undefined') {
+  const savedKey = localStorage.getItem('crunchyLLMKey');
+  if (savedKey) {
+    state.llmApiKey = savedKey;
+    state.llmEnabled = true;
+  }
+}
 
 // ======== CONSTANTS ========
 const METRICS = [
